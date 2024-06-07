@@ -1,5 +1,6 @@
 import mysql.connector
 import tkinter as tk
+from tkinter import ttk
 from PIL import Image, ImageTk
 from passlib.hash import sha256_crypt
 import io 
@@ -103,14 +104,14 @@ def login_user():
     if user:
         if sha256_crypt.verify(password, user[4]):  
             label_status.config(text="Вход выполнен успешно")
-            open_delivery_viewing_window() 
+            open_delivery_viewing_window(user) 
         else:
             label_status.config(text="Неверный пароль")
     else:
         label_status.config(text="Пользователь не найден")
 
 #Основное окно покупок
-def open_delivery_viewing_window():
+def open_delivery_viewing_window(logged_in_user):
     delivery_window = tk.Toplevel(root)
     delivery_window.title("Информация о продуктах")
   
@@ -166,6 +167,7 @@ def open_delivery_viewing_window():
     products_frame = tk.Frame(delivery_window)
     products_frame.pack(expand=True, fill=tk.BOTH, padx=10, pady=10)
 
+    
 
     def display_products(products):
         for widget in products_frame.winfo_children():
@@ -196,6 +198,147 @@ def open_delivery_viewing_window():
             if column_index >= columns:
                 column_index = 0
                 row_index += 2
+    
+    sql = "SELECT name, surname, address, number, photo FROM user WHERE id = %s"
+    cursor.execute(sql, (logged_in_user[0],))
+    user_info = cursor.fetchone()
+
+    if user_info:
+        user_name, user_surname, user_address, user_number, user_photo_data = user_info
+    else:
+        user_name, user_surname, user_address, user_number, user_photo_data = "", "", "", "", None
+
+    user_info_frame = tk.Frame(delivery_window, bg='#FFFFFF', bd=2, relief=tk.RIDGE)
+    user_info_frame.place(relx=0.99, rely=0.01, anchor=tk.NE)
+
+    user_name_label = tk.Label(user_info_frame, text=f"{logged_in_user[1]} {logged_in_user[2]}", font=('Arial', 12), bg='#FFFFFF')
+    user_name_label.pack(side=tk.LEFT, padx=5)
+    
+    user_name_label.bind("<Button-1>", lambda event: show_user_info(logged_in_user, delivery_window))
+
+    def show_user_info(logged_in_user, delivery_window):
+        user_info_window = tk.Toplevel(delivery_window)
+        user_info_window.title("Информация о пользователе")
+    
+        tab_control = ttk.Notebook(user_info_window)
+
+        info_tab = ttk.Frame(tab_control)
+        change_password_tab = ttk.Frame(tab_control)
+
+        tab_control.add(info_tab, text='Информация')
+        tab_control.add(change_password_tab, text='Смена пароля')
+        tab_control.pack(expand=True, fill='both')
+
+        info_frame = tk.Frame(info_tab, bg='#FFFFFF')
+        info_frame.pack(expand=True, fill='both')
+
+        label_name = tk.Label(info_frame, text=f"Имя: {logged_in_user[1]}", font=('Arial', 14), bg='#FFFFFF')
+        label_name.grid(row=0, column=0, padx=10, pady=5, sticky='w')
+    
+        label_surname = tk.Label(info_frame, text=f"Фамилия: {logged_in_user[2]}", font=('Arial', 14), bg='#FFFFFF')
+        label_surname.grid(row=1, column=0, padx=10, pady=5, sticky='w')
+    
+        label_address = tk.Label(info_frame, text=f"Адрес: {logged_in_user[5]}", font=('Arial', 14), bg='#FFFFFF')
+        label_address.grid(row=2, column=0, padx=10, pady=5, sticky='w')
+    
+        label_number = tk.Label(info_frame, text=f"Номер: {logged_in_user[6]}", font=('Arial', 14), bg='#FFFFFF')
+        label_number.grid(row=3, column=0, padx=10, pady=5, sticky='w')
+
+        def update_user_field(field, new_value, label_status):
+            if not new_value:
+                label_status.config(text=f"{field.capitalize()} не может быть пустым")
+                return
+
+            sql = f"UPDATE user SET {field} = %s WHERE id = %s"
+            cursor.execute(sql, (new_value, logged_in_user[0]))
+            db.commit()
+            label_status.config(text=f"{field.capitalize()} обновлено")
+            setattr(logged_in_user, field, new_value)
+
+        entry_new_name = tk.Entry(info_frame, font=('Arial', 12), bd=2, relief=tk.SOLID)
+        entry_new_name.grid(row=0, column=1, padx=10, pady=5)
+        button_update_name = tk.Button(info_frame, text="Обновить имя", font=('Arial', 12), 
+                                   command=lambda: update_user_field('name', entry_new_name.get(), label_status_name))
+        button_update_name.grid(row=0, column=2, padx=10, pady=5)
+        label_status_name = tk.Label(info_frame, text="", font=('Arial', 12), bg='#FFFFFF')
+        label_status_name.grid(row=0, column=3, padx=10, pady=5)
+
+        entry_new_surname = tk.Entry(info_frame, font=('Arial', 12), bd=2, relief=tk.SOLID)
+        entry_new_surname.grid(row=1, column=1, padx=10, pady=5)
+        button_update_surname = tk.Button(info_frame, text="Обновить фамилию", font=('Arial', 12), 
+                                      command=lambda: update_user_field('surname', entry_new_surname.get(), label_status_surname))
+        button_update_surname.grid(row=1, column=2, padx=10, pady=5)
+        label_status_surname = tk.Label(info_frame, text="", font=('Arial', 12), bg='#FFFFFF')
+        label_status_surname.grid(row=1, column=3, padx=10, pady=5)
+
+        entry_new_address = tk.Entry(info_frame, font=('Arial', 12), bd=2, relief=tk.SOLID)
+        entry_new_address.grid(row=2, column=1, padx=10, pady=5)
+        button_update_address = tk.Button(info_frame, text="Обновить адрес", font=('Arial', 12), 
+                                      command=lambda: update_user_field('address', entry_new_address.get(), label_status_address))
+        button_update_address.grid(row=2, column=2, padx=10, pady=5)
+        label_status_address = tk.Label(info_frame, text="", font=('Arial', 12), bg='#FFFFFF')
+        label_status_address.grid(row=2, column=3, padx=10, pady=5)
+
+        entry_new_number = tk.Entry(info_frame, font=('Arial', 12), bd=2, relief=tk.SOLID)
+        entry_new_number.grid(row=3, column=1, padx=10, pady=5)
+        button_update_number = tk.Button(info_frame, text="Обновить номер", font=('Arial', 12), 
+                                     command=lambda: update_user_field('number', entry_new_number.get(), label_status_number))
+        button_update_number.grid(row=3, column=2, padx=10, pady=5)
+        label_status_number = tk.Label(info_frame, text="", font=('Arial', 12), bg='#FFFFFF')
+        label_status_number.grid(row=3, column=3, padx=10, pady=5)
+
+        change_password_frame = tk.Frame(change_password_tab, bg='#FFFFFF')
+        change_password_frame.pack(expand=True, fill='both')
+
+        label_old_password = tk.Label(change_password_frame, text="Старый пароль:", font=('Arial', 14), bg='#FFFFFF')
+        label_old_password.grid(row=0, column=0, padx=10, pady=5, sticky='e')
+        entry_old_password = tk.Entry(change_password_frame, show="*", font=('Arial', 12), bd=2, relief=tk.SOLID)
+        entry_old_password.grid(row=0, column=1, padx=10, pady=5)
+
+        label_new_password = tk.Label(change_password_frame, text="Новый пароль:", font=('Arial', 14), bg='#FFFFFF')
+        label_new_password.grid(row=1, column=0, padx=10, pady=5, sticky='e')
+        entry_new_password = tk.Entry(change_password_frame, show="*", font=('Arial', 12), bd=2, relief=tk.SOLID)
+        entry_new_password.grid(row=1, column=1, padx=10, pady=5)
+
+        label_new_password_confirm = tk.Label(change_password_frame, text="Повторите новый пароль:", font=('Arial', 14), bg='#FFFFFF')
+        label_new_password_confirm.grid(row=2, column=0, padx=10, pady=5, sticky='e')
+        entry_new_password_confirm = tk.Entry(change_password_frame, show="*", font=('Arial', 12), bd=2, relief=tk.SOLID)
+        entry_new_password_confirm.grid(row=2, column=1, padx=10, pady=5)
+
+        def change_password():
+            old_password = entry_old_password.get()
+            new_password = entry_new_password.get()
+            new_password_confirm = entry_new_password_confirm.get()
+
+            if not all([old_password, new_password, new_password_confirm]):
+                label_status_password.config(text="Все поля должны быть заполнены")
+                return
+
+            if new_password != new_password_confirm:
+                label_status_password.config(text="Новые пароли не совпадают")
+                return
+
+            if logged_in_user[4]:
+                if not sha256_crypt.verify(old_password, logged_in_user[4]):
+                    label_status_password.config(text="Старый пароль неверный")
+                    return
+            else:
+                label_status_password.config(text="Старый пароль не был установлен")
+                return
+
+            new_hashed_password = sha256_crypt.hash(new_password)
+            sql = "UPDATE user SET password_hash = %s WHERE id = %s"
+            cursor.execute(sql, (new_hashed_password, logged_in_user[0]))
+            db.commit()
+            label_status_password.config(text="Пароль успешно изменен")
+    
+            logged_in_user[4] = new_hashed_password
+
+        button_change_password = tk.Button(change_password_frame, text="Изменить пароль", font=('Arial', 12), command=change_password)
+        button_change_password.grid(row=3, columnspan=2, pady=10)
+
+        label_status_password = tk.Label(change_password_frame, text="", font=('Arial', 12), bg='#FFFFFF')
+        label_status_password.grid(row=4, columnspan=2, pady=10)
 
     def show_product_info(product_id):
         sql = """SELECT product.name, product.description, product.price, product.weight, restaurant.name, category.category
@@ -226,10 +369,12 @@ def open_delivery_viewing_window():
             error_window.title("Ошибка")
             error_label = tk.Label(error_window, text=f"Продукт с ID {product_id} не найден", font=('Arial', 14), padx=20, pady=20)
             error_label.pack()
-
+    
 
     cursor.execute("SELECT id, name FROM product")
     display_products(cursor.fetchall())
+
+    
 
 
 # окно входа 
