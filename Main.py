@@ -2,6 +2,7 @@ import mysql.connector
 import tkinter as tk
 from PIL import Image, ImageTk
 from passlib.hash import sha256_crypt
+import io 
 
 # Подключение к Mysql (Не забыть поменять порт!!!)
 db = mysql.connector.connect(
@@ -112,7 +113,7 @@ def login_user():
 def open_delivery_viewing_window():
     delivery_window = tk.Toplevel(root)
     delivery_window.title("Информация о продуктах")
-    
+  
     screen_width = root.winfo_screenwidth()
     screen_height = root.winfo_screenheight()
     delivery_window.geometry(f"{screen_width}x{screen_height}")
@@ -159,27 +160,42 @@ def open_delivery_viewing_window():
     search_button = tk.Button(search_frame, text="Поиск", command=search_products)
     search_button.pack(side=tk.LEFT, padx=5)
 
+    separator_frame = tk.Frame(delivery_window, height=2, bd=1, relief=tk.SUNKEN, bg='#808080')
+    separator_frame.pack(fill=tk.X, padx=10, pady=(0, 10))
+
     products_frame = tk.Frame(delivery_window)
     products_frame.pack(expand=True, fill=tk.BOTH, padx=10, pady=10)
+
 
     def display_products(products):
         for widget in products_frame.winfo_children():
             widget.destroy()
 
-        columns = 3
+        columns = 4
         row_index = 0
         column_index = 0
 
         for product in products:
             product_id, product_name = product
+    
+            cursor.execute("SELECT photo FROM product WHERE id = %s", (product_id,))
+            photo_data = cursor.fetchone()[0]
+            if photo_data:
+                photo = Image.open(io.BytesIO(photo_data))
+                photo = photo.resize((100, 100), Image.LANCZOS)
+                photo = ImageTk.PhotoImage(photo)
+                photo_label = tk.Label(products_frame, image=photo)
+                photo_label.image = photo
+                photo_label.grid(row=row_index, column=column_index, padx=5, pady=5, sticky="nsew")
+
             product_label = tk.Label(products_frame, text=product_name, bg='lightblue', relief=tk.RAISED, font=('Arial', 14))
             product_label.bind("<Button-1>", lambda event, id=product_id: show_product_info(id))
-            product_label.grid(row=row_index, column=column_index, padx=5, pady=5, sticky="nsew")
+            product_label.grid(row=row_index + 1, column=column_index, padx=5, pady=5, sticky="nsew")
 
             column_index += 1
             if column_index >= columns:
                 column_index = 0
-                row_index += 1
+                row_index += 2
 
     def show_product_info(product_id):
         sql = """SELECT product.name, product.description, product.price, product.weight, restaurant.name, category.category
@@ -193,7 +209,8 @@ def open_delivery_viewing_window():
 
         if product:
             product_window = tk.Toplevel(delivery_window)
-            product_window.title(product[0])  
+            product_window.title(product[0]) 
+
 
             product_info = f"""
             Описание: {product[1]}
@@ -210,14 +227,9 @@ def open_delivery_viewing_window():
             error_label = tk.Label(error_window, text=f"Продукт с ID {product_id} не найден", font=('Arial', 14), padx=20, pady=20)
             error_label.pack()
 
+
     cursor.execute("SELECT id, name FROM product")
     display_products(cursor.fetchall())
-
-root = tk.Tk()
-root.title("Сервис для доставки еды")
-
-
-root.mainloop()
 
 
 # окно входа 
