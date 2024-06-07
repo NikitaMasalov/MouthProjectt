@@ -193,6 +193,9 @@ def open_delivery_viewing_window(logged_in_user):
             product_label = tk.Label(products_frame, text=product_name, bg='lightblue', relief=tk.RAISED, font=('Arial', 14))
             product_label.bind("<Button-1>", lambda event, id=product_id: show_product_info(id))
             product_label.grid(row=row_index + 1, column=column_index, padx=5, pady=5, sticky="nsew")
+            
+            add_to_cart_button = tk.Button(products_frame, text="Добавить в корзину", command=lambda id=product_id: add_to_cart(id))
+            add_to_cart_button.grid(row=row_index + 2, column=column_index, padx=5, pady=5)
 
             column_index += 1
             if column_index >= columns:
@@ -370,12 +373,65 @@ def open_delivery_viewing_window(logged_in_user):
             error_label = tk.Label(error_window, text=f"Продукт с ID {product_id} не найден", font=('Arial', 14), padx=20, pady=20)
             error_label.pack()
     
+    button_open_cart = tk.Button(search_frame, text="Корзина", font=('Arial', 12), command=lambda: open_cart_window(logged_in_user))
+    button_open_cart.pack(side=tk.TOP, pady=10, padx=10)
+
+    def open_cart_window(logged_in_user):
+        cart_window = tk.Toplevel(root)
+        cart_window.title("Корзина")
+
+        cart_frame = tk.Frame(cart_window)
+        cart_frame.pack(expand=True, fill='both', padx=10, pady=10)
+
+        def display_cart():
+            for widget in cart_frame.winfo_children():
+                widget.destroy()
+
+            cursor.execute("""SELECT cart.id, product.id, product.name, product.price
+                            FROM cart
+                            JOIN product ON cart.product_id = product.id
+                            WHERE cart.user_id = %s""", (logged_in_user[0],))
+            cart_items = cursor.fetchall()
+
+            if cart_items:
+                total_price = 0
+
+                for index, cart_item in enumerate(cart_items):
+                    cart_id, product_id, product_name, product_price = cart_item
+                    label_product = tk.Label(cart_frame, text=f"{product_name} - {product_price} руб.", font=('Arial', 12), bg='lightblue', relief=tk.RAISED)
+                    label_product.grid(row=index, column=0, padx=5, pady=5, sticky="nsew")
+
+                    delete_button = tk.Button(cart_frame, text="Удалить", command=lambda id=cart_id: delete_from_cart(id))
+                    delete_button.grid(row=index, column=1, padx=5, pady=5)
+
+                    total_price += product_price
+
+                label_total_price = tk.Label(cart_frame, text=f"Общая сумма: {total_price} руб.", font=('Arial', 12), bg='lightblue', relief=tk.RAISED)
+                label_total_price.grid(row=len(cart_items), column=0, columnspan=2, padx=5, pady=5, sticky="nsew")
+
+            else:
+                label_empty_cart = tk.Label(cart_frame, text="Корзина пуста", font=('Arial', 14), padx=20, pady=20)
+                label_empty_cart.grid(row=0, column=0, columnspan=2)
+
+
+        display_cart()
+    
+    def delete_from_cart(cart_id):
+        sql = "DELETE FROM cart WHERE id = %s"
+        cursor.execute(sql, (cart_id,))
+        db.commit()
+        
+# Функция добавления товара в корзину
+    def add_to_cart(product_id):
+        sql = "INSERT INTO cart (user_id, product_id, quantity) VALUES (%s, %s, %s)"
+        values = (logged_in_user[0], product_id, 1)
+        cursor.execute(sql, values)
+        db.commit()
+        label_status.config(text="Товар добавлен в корзину")
+
 
     cursor.execute("SELECT id, name FROM product")
     display_products(cursor.fetchall())
-
-    
-
 
 # окно входа 
 root = tk.Tk()
