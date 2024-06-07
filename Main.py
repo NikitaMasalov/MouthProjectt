@@ -100,7 +100,7 @@ def login_user():
     user = cursor.fetchone()
 
     if user:
-        if sha256_crypt.verify(password, user[3]):  
+        if sha256_crypt.verify(password, user[4]):  
             label_status.config(text="Вход выполнен успешно")
             open_delivery_viewing_window() 
         else:
@@ -110,8 +110,115 @@ def login_user():
 
 #Основное окно покупок
 def open_delivery_viewing_window():
-    open_delivery_viewing_window = tk.Toplevel(root)
-    open_delivery_viewing_window.title("Сервис для доставки еды")
+    delivery_window = tk.Toplevel(root)
+    delivery_window.title("Информация о продуктах")
+    
+    screen_width = root.winfo_screenwidth()
+    screen_height = root.winfo_screenheight()
+    delivery_window.geometry(f"{screen_width}x{screen_height}")
+
+    search_frame = tk.Frame(delivery_window)
+    search_frame.pack(fill=tk.X, padx=10, pady=10)
+
+    category_label = tk.Label(search_frame, text="Категория:", font=('Arial', 12))
+    category_label.pack(side=tk.LEFT, padx=5)
+    category_entry = tk.Entry(search_frame, font=('Arial', 12), bd=2, relief=tk.SOLID)
+    category_entry.pack(side=tk.LEFT, padx=5)
+
+    search_label = tk.Label(search_frame, text="Поиск:", font=('Arial', 12))
+    search_label.pack(side=tk.LEFT, padx=5)
+    search_entry = tk.Entry(search_frame, font=('Arial', 12), bd=2, relief=tk.SOLID)
+    search_entry.pack(side=tk.LEFT, padx=5)
+
+    def search_by_category():
+        category = category_entry.get()
+        if category:
+            cursor.execute("""SELECT product.id, product.name
+                              FROM product
+                              JOIN category_has_product ON product.id = category_has_product.product_id
+                              JOIN category ON category_has_product.category_id = category.id
+                              WHERE category.category = %s""", (category,))
+            display_products(cursor.fetchall())
+        else:
+            display_products([])
+
+    def search_products():
+        search_term = search_entry.get()
+        if search_term:
+            cursor.execute("""SELECT id, name
+                              FROM product
+                              WHERE name LIKE %s OR description LIKE %s""", 
+                           (f"%{search_term}%", f"%{search_term}%"))
+            display_products(cursor.fetchall())
+        else:
+            display_products([])
+
+    category_button = tk.Button(search_frame, text="Поиск по категории", command=search_by_category)
+    category_button.pack(side=tk.LEFT, padx=5)
+
+    search_button = tk.Button(search_frame, text="Поиск", command=search_products)
+    search_button.pack(side=tk.LEFT, padx=5)
+
+    products_frame = tk.Frame(delivery_window)
+    products_frame.pack(expand=True, fill=tk.BOTH, padx=10, pady=10)
+
+    def display_products(products):
+        for widget in products_frame.winfo_children():
+            widget.destroy()
+
+        columns = 3
+        row_index = 0
+        column_index = 0
+
+        for product in products:
+            product_id, product_name = product
+            product_label = tk.Label(products_frame, text=product_name, bg='lightblue', relief=tk.RAISED, font=('Arial', 14))
+            product_label.bind("<Button-1>", lambda event, id=product_id: show_product_info(id))
+            product_label.grid(row=row_index, column=column_index, padx=5, pady=5, sticky="nsew")
+
+            column_index += 1
+            if column_index >= columns:
+                column_index = 0
+                row_index += 1
+
+    def show_product_info(product_id):
+        sql = """SELECT product.name, product.description, product.price, product.weight, restaurant.name, category.category
+                 FROM product
+                 JOIN restaurant ON product.restaurant_id = restaurant.id
+                 JOIN category_has_product ON product.id = category_has_product.product_id
+                 JOIN category ON category_has_product.category_id = category.id
+                 WHERE product.id = %s"""
+        cursor.execute(sql, (product_id,))
+        product = cursor.fetchone()
+
+        if product:
+            product_window = tk.Toplevel(delivery_window)
+            product_window.title(product[0])  
+
+            product_info = f"""
+            Описание: {product[1]}
+            Цена: {product[2]}
+            Вес: {product[3]}. гр.
+            Ресторан: {product[4]}
+            Категория: {product[5]}
+            """
+            product_info_label = tk.Label(product_window, text=product_info, font=('Arial', 14), padx=20, pady=20)
+            product_info_label.pack()
+        else:
+            error_window = tk.Toplevel(delivery_window)
+            error_window.title("Ошибка")
+            error_label = tk.Label(error_window, text=f"Продукт с ID {product_id} не найден", font=('Arial', 14), padx=20, pady=20)
+            error_label.pack()
+
+    cursor.execute("SELECT id, name FROM product")
+    display_products(cursor.fetchall())
+
+root = tk.Tk()
+root.title("Сервис для доставки еды")
+
+
+root.mainloop()
+
 
 # окно входа 
 root = tk.Tk()
