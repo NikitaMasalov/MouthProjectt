@@ -4,6 +4,8 @@ from tkinter import ttk
 from PIL import Image, ImageTk
 from passlib.hash import sha256_crypt
 import io 
+import datetime
+from tkinter import messagebox
 
 # Подключение к Mysql (Не забыть поменять порт!!!)
 db = mysql.connector.connect(
@@ -97,19 +99,88 @@ def login_user():
     username = entry_username.get()
     password = entry_password.get()
 
+    # Проверка пользователя как доставщика
+    sql = "SELECT * FROM deliveryman WHERE name = %s"
+    cursor.execute(sql, (username,))
+    delivery_user = cursor.fetchone()
+
+    if delivery_user:
+        if sha256_crypt.verify(password, delivery_user[8]):  
+            label_status.config(text="Вход выполнен успешно как доставщик")
+            courier_window(delivery_user) 
+            return 
+        else:
+            label_status.config(text="Неверный пароль для доставщика")
+            return 
+
     sql = "SELECT * FROM user WHERE name = %s"
     cursor.execute(sql, (username,))
     user = cursor.fetchone()
 
     if user:
         if sha256_crypt.verify(password, user[4]):  
-            label_status.config(text="Вход выполнен успешно")
+            label_status.config(text="Вход выполнен успешно как пользователь")
             open_delivery_viewing_window(user) 
         else:
-            label_status.config(text="Неверный пароль")
+            label_status.config(text="Неверный пароль для пользователя")
     else:
         label_status.config(text="Пользователь не найден")
 
+
+def courier_window(delivery_user):
+    courier_window = tk.Toplevel(root)
+    courier_window.title("Окно курьера")
+
+    cursor.execute("SELECT * FROM Orders WHERE status = 'accepted'")
+    new_orders = cursor.fetchall()
+
+    cursor.execute("SELECT * FROM Orders WHERE status = 'in delivery' AND deliveryman_id = %s", (delivery_user[0],))
+    accept_orders = cursor.fetchall()
+
+    order_listbox = tk.Listbox(courier_window, width=70)
+    order_listbox.grid(row=0, column=0, padx=10, pady=10)
+    for order in new_orders:
+        order_info = f"Заказ №{order[0]} | Адрес: {order[3]} | Время заказа: {order[5]}"
+        order_listbox.insert(tk.END, order_info)
+
+    order_accept_listbox = tk.Listbox(courier_window, width=70)
+    order_accept_listbox.grid(row=0, column=1, padx=10, pady=10)
+    for order in accept_orders:
+        order_info1 = f"Заказ №{order[0]} | Адрес: {order[3]} | Время заказа: {order[5]}"
+        order_accept_listbox.insert(tk.END, order_info1)
+
+    def accept_order(user, order_id):
+        cursor.execute("UPDATE Orders SET status = 'in delivery', deliveryman_id = %s WHERE id = %s", (delivery_user[0], order_id))
+        db.commit()
+
+        messagebox.showinfo("Заказ принят", f"Вы приняли заказ №{order_id}.")
+
+        cursor.execute("SELECT * FROM Orders WHERE status = 'accepted'")
+        new_orders = cursor.fetchall()
+        order_listbox.delete(0, tk.END)
+        for order in new_orders:
+            order_info = f"Заказ №{order[0]} | Адрес: {order[3]} | Время заказа: {order[5]}"
+            order_listbox.insert(tk.END, order_info)
+
+    def complete_delivery(order_info1):
+        order_id = int(order_info1.split(" | ")[0].split("№")[1])
+
+        cursor.execute("UPDATE Orders SET status = 'delivered' WHERE id = %s", (order_id,))
+
+        db.commit()
+
+        messagebox.showinfo("Доставка завершена", f"Заказ №{order_id} успешно доставлен.")
+
+        order_accept_listbox.delete(order_accept_listbox.curselection())
+
+    accept_button = tk.Button(courier_window, text="Принять заказ", command=lambda: accept_order(delivery_user, int(order_listbox.get(order_listbox.curselection()).split(" | ")[0].split("№")[1])))
+    accept_button.grid(row=1, column=0, padx=10, pady=10)
+
+    complete_button = tk.Button(courier_window, text="Завершить доставку", command=lambda: complete_delivery(order_accept_listbox.get(order_accept_listbox.curselection())))
+    complete_button.grid(row=1, column=1, padx=10, pady=10)
+
+    courier_window.mainloop()
+    
 #Основное окно покупок
 def open_delivery_viewing_window(logged_in_user):
     delivery_window = tk.Toplevel(root)
