@@ -409,12 +409,51 @@ def open_delivery_viewing_window(logged_in_user):
                 label_total_price = tk.Label(cart_frame, text=f"Общая сумма: {total_price} руб.", font=('Arial', 12), bg='lightblue', relief=tk.RAISED)
                 label_total_price.grid(row=len(cart_items), column=0, columnspan=2, padx=5, pady=5, sticky="nsew")
 
+                order_button = tk.Button(cart_frame, text="Заказать", command=place_order)
+                order_button.grid(row=len(cart_items) + 1, column=0, columnspan=2, padx=5, pady=5)
+
             else:
                 label_empty_cart = tk.Label(cart_frame, text="Корзина пуста", font=('Arial', 14), padx=20, pady=20)
                 label_empty_cart.grid(row=0, column=0, columnspan=2)
 
+        def place_order():
+            cursor.execute("SELECT address FROM user WHERE id = %s", (logged_in_user[0],))
+            user_address = cursor.fetchone()[0]
+
+            total_price = 0
+            cursor.execute("""SELECT product.price
+                        FROM cart
+                        JOIN product ON cart.product_id = product.id
+                        WHERE cart.user_id = %s""", (logged_in_user[0],))
+            product_prices = cursor.fetchall()
+            for price in product_prices:
+                total_price += price[0]
+
+            payment_window = tk.Toplevel(root)
+            payment_window.title("Выберите способ оплаты")
+
+            payment_options = ["Online", "Cash"]
+            selected_payment = tk.StringVar(payment_window)
+            selected_payment.set(payment_options[0])
+
+            for i, option in enumerate(payment_options):
+                tk.Radiobutton(payment_window, text=option, variable=selected_payment, value=option).grid(row=i, column=0, padx=10, pady=5, sticky="w")
+
+            cursor.execute("""INSERT INTO orders (price, status, address, payment, order_time, user_id)
+                            VALUES (%s, %s, %s, %s, NOW(), %s)""",
+                            (total_price, "accepted", user_address, selected_payment.get(), logged_in_user[0]))
+
+            db.commit()  
+
+
+
+            cursor.execute("DELETE FROM cart WHERE user_id = %s", (logged_in_user[0],))
+            db.commit()
+
+            display_cart()
 
         display_cart()
+
     
     def delete_from_cart(cart_id):
         sql = "DELETE FROM cart WHERE id = %s"
