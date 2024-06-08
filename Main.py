@@ -3,14 +3,13 @@ import tkinter as tk
 from tkinter import ttk
 from PIL import Image, ImageTk
 from passlib.hash import sha256_crypt
-import io 
-import datetime
+import io
 from tkinter import messagebox
 
 # Подключение к Mysql (Не забыть поменять порт!!!)
 db = mysql.connector.connect(
     host="localhost",
-    port="3300",
+    port="3306",
     user="root",
     password="",
     database="mydb"
@@ -279,16 +278,7 @@ def open_delivery_viewing_window(logged_in_user):
 
         for product in products:
             product_id, product_name = product
-    
-            cursor.execute("SELECT photo FROM product WHERE id = %s", (product_id,))
-            photo_data = cursor.fetchone()[0]
-            if photo_data:
-                photo = Image.open(io.BytesIO(photo_data))
-                photo = photo.resize((100, 100), Image.LANCZOS)
-                photo = ImageTk.PhotoImage(photo)
-                photo_label = tk.Label(products_frame, image=photo)
-                photo_label.image = photo
-                photo_label.grid(row=row_index, column=column_index, padx=5, pady=5, sticky="nsew")
+
 
             product_label = tk.Label(products_frame, text=product_name, bg='lightblue', relief=tk.RAISED, font=('Arial', 14))
             product_label.bind("<Button-1>", lambda event, id=product_id: show_product_info(id))
@@ -581,7 +571,7 @@ screen_width = root.winfo_screenwidth()
 screen_height = root.winfo_screenheight()
 root.geometry(f"{screen_width}x{screen_height}")
 
-image_path = "C:/Users/Professional/PycharmProjects/MouthProject/night-3078326_1280-min.jpg"
+image_path = "C:/Users/user/Desktop/MouthProjectt-main/night-3078326_1280.jpg"
 image = Image.open(image_path)
 
 image = image.resize((screen_width, screen_height), Image.LANCZOS)
@@ -590,7 +580,7 @@ bg_image = ImageTk.PhotoImage(image)
 label_bg = tk.Label(root, image=bg_image)
 label_bg.place(x=0, y=0, relwidth=1, relheight=1)
 
-login_frame_width = 300
+login_frame_width = 320
 login_frame_height = 280
 
 login_frame = tk.Frame(root, bg='#FFFFFF', bd=2, relief=tk.RIDGE)
