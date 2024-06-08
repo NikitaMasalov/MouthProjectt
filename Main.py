@@ -131,10 +131,10 @@ def courier_window(delivery_user):
     courier_window = tk.Toplevel(root)
     courier_window.title("Окно курьера")
 
-    cursor.execute("SELECT * FROM Orders WHERE status = 'accepted'")
+    cursor.execute("SELECT * FROM orders WHERE status = 'accepted'")
     new_orders = cursor.fetchall()
 
-    cursor.execute("SELECT * FROM Orders WHERE status = 'in delivery' AND deliveryman_id = %s", (delivery_user[0],))
+    cursor.execute("SELECT * FROM orders WHERE status = 'in delivery' AND deliveryman_id = %s", (delivery_user[0],))
     accept_orders = cursor.fetchall()
 
     order_listbox = tk.Listbox(courier_window, width=70)
@@ -150,12 +150,12 @@ def courier_window(delivery_user):
         order_accept_listbox.insert(tk.END, order_info1)
 
     def accept_order(user, order_id):
-        cursor.execute("UPDATE Orders SET status = 'in delivery', deliveryman_id = %s WHERE id = %s", (delivery_user[0], order_id))
+        cursor.execute("UPDATE orders SET status = 'in delivery', deliveryman_id = %s WHERE id = %s", (delivery_user[0], order_id))
         db.commit()
 
         messagebox.showinfo("Заказ принят", f"Вы приняли заказ №{order_id}.")
 
-        cursor.execute("SELECT * FROM Orders WHERE status = 'accepted'")
+        cursor.execute("SELECT * FROM orders WHERE status = 'accepted'")
         new_orders = cursor.fetchall()
         order_listbox.delete(0, tk.END)
         for order in new_orders:
@@ -165,7 +165,7 @@ def courier_window(delivery_user):
     def complete_delivery(order_info1):
         order_id = int(order_info1.split(" | ")[0].split("№")[1])
 
-        cursor.execute("UPDATE Orders SET status = 'delivered' WHERE id = %s", (order_id,))
+        cursor.execute("UPDATE orders SET status = 'delivered' WHERE id = %s", (order_id,))
 
         db.commit()
 
@@ -173,13 +173,42 @@ def courier_window(delivery_user):
 
         order_accept_listbox.delete(order_accept_listbox.curselection())
 
+    def view_order_details(order_info):
+        order_id = int(order_info.split(" | ")[0].split("№")[1])
+
+        try:
+            cursor.execute("""
+                SELECT orders.id, orders.address, orders.order_time, user.name, user.address, user.number, product.name, orders_has_product.Count 
+                FROM orders 
+                JOIN user ON orders.user_id = user.id 
+                JOIN orders_has_product ON orders.id = orders_has_product.orders_id 
+                JOIN product ON orders_has_product.product_id = product.id
+                WHERE orders.id = %s
+            """, (order_id,))
+            order_details = cursor.fetchall()
+
+            if order_details:
+                details = f"Заказ №{order_details[0][0]}\nАдрес: {order_details[0][1]}\nВремя заказа: {order_details[0][2]}\nЗаказчик: {order_details[0][3]} ({order_details[0][4]}, {order_details[0][5]})\n\nСодержимое заказа:\n"
+                for item in order_details:
+                    details += f"- {item[6]}: {item[7]} шт.\n"
+
+                messagebox.showinfo("Детали заказа", details)
+            else:
+                messagebox.showinfo("Ошибка", "Не удалось загрузить детали заказа.")
+        except mysql.connector.errors.ProgrammingError as e:
+            messagebox.showerror("Ошибка", f"Ошибка при выполнении запроса: {e}")
+
     accept_button = tk.Button(courier_window, text="Принять заказ", command=lambda: accept_order(delivery_user, int(order_listbox.get(order_listbox.curselection()).split(" | ")[0].split("№")[1])))
     accept_button.grid(row=1, column=0, padx=10, pady=10)
 
     complete_button = tk.Button(courier_window, text="Завершить доставку", command=lambda: complete_delivery(order_accept_listbox.get(order_accept_listbox.curselection())))
     complete_button.grid(row=1, column=1, padx=10, pady=10)
 
+    view_details_button = tk.Button(courier_window, text="Посмотреть детали", command=lambda: view_order_details(order_listbox.get(order_listbox.curselection())))
+    view_details_button.grid(row=2, column=0, padx=10, pady=10)
+
     courier_window.mainloop()
+
     
 #Основное окно покупок
 def open_delivery_viewing_window(logged_in_user):
